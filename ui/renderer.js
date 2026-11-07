@@ -367,11 +367,29 @@ const showNameExample = () => {
   const style = $('settings').querySelector('input[name=filename]:checked')?.value;
   $('filename-example').textContent = style ? `e.g. ${NAME_EXAMPLES[style]}` : '';
 };
+// Speed limit: the slider's steps, slowest first (ytdlp::SPEED_LIMITS: K and M are KiB and MiB, like fmtBytes)
+const SPEEDS = ['500K', '1M', '2M', '5M', '10M', '25M', '50M', 'unlimited'];
+const speedText = v => (v === 'unlimited' ? 'Unlimited' : `${parseInt(v, 10)} ${v.endsWith('K') ? 'KB' : 'MB'}/s`);
+function showSpeed() {
+  const slider = $('speed');
+  const text = speedText(SPEEDS[slider.value]);
+  $('speed-value').textContent = text;
+  slider.setAttribute('aria-valuetext', text); // screen readers say "5 MB/s", not "3"
+  slider.style.setProperty('--p', `${(slider.value / slider.max) * 100}%`);
+}
+$('speed').max = SPEEDS.length - 1;
+$('speed').addEventListener('input', showSpeed);
+$('speed').addEventListener('change', () => window.api.setSetting('speed', SPEEDS[$('speed').value]));
+
 window.api.settings().then(s => {
   for (const input of $('settings').querySelectorAll('input[type=radio]')) input.checked = s[input.name] === input.value;
   showNameExample();
+  const step = SPEEDS.indexOf(s.speed);
+  $('speed').value = step < 0 ? SPEEDS.length - 1 : step; // unknown: no cap, like the backend
+  showSpeed();
 });
 $('settings').addEventListener('change', e => {
+  if (e.target.type !== 'radio') return; // the slider saves itself, as a SPEEDS value
   window.api.setSetting(e.target.name, e.target.value);
   showNameExample();
 });

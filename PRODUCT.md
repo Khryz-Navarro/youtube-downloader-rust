@@ -51,11 +51,13 @@ and "Show in folder" opening File Explorer. Its installer is about 23 MB, most o
   permanently, a finished file to the Recycle Bin after a confirm.
 - **Managed tools:** yt-dlp downloads on first launch and runs `yt-dlp -U` every launch; the status bar
   shows its version and update state. ffmpeg is bundled.
-- **Settings:** Theme (Light, Dark, Desktop = follow Windows), Text and page size (100/125/150/175%) and
-  File names (Classic, Basic, Pretty, Nerdy; the finished file is renamed, never over another file).
+- **Settings:** Theme (Light, Dark, Desktop = follow Windows), Text and page size (100/125/150/175%),
+  File names (Classic, Basic, Pretty, Nerdy; the finished file is renamed, never over another file) and
+  Speed limit (a slider: 500 KB/s to 50 MB/s per download, or Unlimited; yt-dlp's `--limit-rate`).
   About shows the app, yt-dlp, ffmpeg and runtime versions. Last quality and folder are remembered.
 - **Terminology in the UI:** New download, Downloads, Quality, Video, Audio, Custom, Paste, Change, Download,
-  Show in folder, Retry, Resume, Clear finished, Settings, Theme, Desktop, Text and page size, File names.
+  Show in folder, Retry, Resume, Clear finished, Settings, Theme, Desktop, Text and page size, File names,
+  Speed limit.
 - **Constraints:** Windows only (tested on Windows 11). One video per link (playlists are ignored). No
   cookies or login, so age-restricted and members-only videos fail. Only http(s) links reach yt-dlp. The
   installer is not code-signed. The app doesn't update itself (yt-dlp does).

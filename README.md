@@ -65,7 +65,8 @@ happening, and cleans up after itself.
      writing for that download.
    - **Clear finished** tidies the list without touching any files.
 
-It also remembers your last quality, your folder and your Settings (theme, text and page size, file names).
+It also remembers your last quality, your folder and your Settings (theme, text and page size, file names,
+speed limit).
 
 ### What it doesn't do
 
@@ -122,6 +123,8 @@ The exact yt-dlp options are in [Quality options](#quality-options).
   - what's happening now: *Video · 225 MB of 921 MB · 11 MB/s · 1m left*, then the audio stream, then
     *Merging video and audio…* or *Converting to MP3…*, or yt-dlp's reason if it failed.
 - **Several at once:** each download runs in its own yt-dlp process.
+- **Speed limit:** **Settings → Speed limit** caps how fast each download may go, so the app doesn't take
+  your whole connection.
 - **Pause and Resume:** Pause keeps the partial file and Resume continues from it. Not available while
   merging.
 - **Cancel and Retry:** Retry starts a canceled or failed download again, picking up any partial file.
@@ -169,6 +172,12 @@ The exact yt-dlp options are in [Quality options](#quality-options).
   - **Text and page size:** 100%, 125%, 150% or 175%. It zooms the whole window, for large or high-DPI
     screens.
   - **File names:** Classic, Basic, Pretty or Nerdy.
+  - **Speed limit:** a slider with eight steps: 500 KB/s, 1, 2, 5, 10, 25 or 50 MB/s, or **Unlimited**
+    (the default).
+    - It caps each download on its own (yt-dlp's `--limit-rate`), so two downloads at 5 MB/s can use
+      10 MB/s together.
+    - It uses the same units as the download rows.
+    - It takes effect on downloads you start or resume after changing it.
 - **Keyboard:**
   - every control is reachable with <kbd>Tab</kbd>;
   - arrow keys move between the tabs and between options;
@@ -308,7 +317,7 @@ quality is never touched.
 |---|---|
 | Your downloads | The folder shown in the app (default: your Downloads folder) |
 | yt-dlp program | `%APPDATA%\com.khryz.ytdownloader\bin\yt-dlp.exe` |
-| Settings (theme, text and page size, file names) | `%APPDATA%\com.khryz.ytdownloader\settings.json` |
+| Settings (theme, text and page size, file names, speed limit) | `%APPDATA%\com.khryz.ytdownloader\settings.json` |
 | Remembered quality and folder | WebView2 storage in `%LOCALAPPDATA%\com.khryz.ytdownloader` |
 | ffmpeg | `ffmpeg.exe` next to the app's exe (`binaries\` in the source tree) |
 

@@ -21,10 +21,11 @@ use tauri_plugin_dialog::DialogExt;
 static READY: OnceLock<Result<(), String>> = OnceLock::new();
 
 // Settings window values. They come from the page, so only these are accepted.
-const SETTINGS: [(&str, &[&str]); 3] = [
+const SETTINGS: [(&str, &[&str]); 4] = [
     ("theme", &["system", "light", "dark"]),
     ("scale", &["1", "1.25", "1.5", "1.75"]),
     ("filename", &["classic", "basic", "pretty", "nerdy"]), // ytdlp::styled_name
+    ("speed", &ytdlp::SPEED_LIMITS),
 ];
 
 struct Job {
@@ -194,9 +195,12 @@ fn run_download(app: &AppHandle, id: &str, url: &str, quality: &str, folder: &st
     };
     let state = app.state::<AppState>();
     let ffmpeg = ffmpeg_path();
-    let style = state.settings.lock().unwrap()["filename"].as_str().unwrap_or("classic").to_string();
+    // the settings when the download starts (or resumes): changing them doesn't touch one that's running
+    let settings = state.settings.lock().unwrap().clone();
+    let style = settings["filename"].as_str().unwrap_or("classic");
+    let limit = settings["speed"].as_str().filter(|s| *s != "unlimited");
     let spawned = ytdlp::assert_url(url)
-        .and_then(|url| ytdlp::download_args(&url, quality, folder, ffmpeg.as_deref().and_then(Path::to_str)))
+        .and_then(|url| ytdlp::download_args(&url, quality, folder, ffmpeg.as_deref().and_then(Path::to_str), limit))
         .and_then(|args| {
             wait_ready()?;
             let cmd = command(bin_path(app)).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn();
@@ -252,7 +256,7 @@ fn run_download(app: &AppHandle, id: &str, url: &str, quality: &str, folder: &st
     // Audio downloads: yt-dlp fetched the stream as-is; convert it while still registered as this job
     let converted = match (ytdlp::audio_target(quality), &file) {
         (Some(target), Some(source)) if ok && stop.lock().unwrap().is_none() => {
-            let styled = ytdlp::styled_name(&style, &name, target.0);
+            let styled = ytdlp::styled_name(style, &name, target.0);
             Some(convert_audio(app, id, &stop, source, target, styled, ffmpeg.as_deref()))
         }
         _ => None,
@@ -272,7 +276,7 @@ fn run_download(app: &AppHandle, id: &str, url: &str, quality: &str, folder: &st
         // Settings → File names name, or keeps the working one if that can't be done
         None => {
             file = file.map(|f| {
-                let styled = f.extension().and_then(|ext| ytdlp::styled_name(&style, &name, &ext.to_string_lossy()));
+                let styled = f.extension().and_then(|ext| ytdlp::styled_name(style, &name, &ext.to_string_lossy()));
                 styled.and_then(|n| place(&f, &n).ok()).unwrap_or(f)
             })
         }
@@ -396,7 +400,8 @@ fn settings_path(app: &AppHandle) -> PathBuf {
 
 fn load_settings(app: &AppHandle) -> Value {
     let saved: Value = std::fs::read(settings_path(app)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-    let mut settings = json!({ "theme": "system", "scale": "1", "filename": "classic" }); // first run or unreadable file: defaults
+    // first run or unreadable file: defaults
+    let mut settings = json!({ "theme": "system", "scale": "1", "filename": "classic", "speed": "unlimited" });
     for (key, allowed) in SETTINGS {
         if let Some(value) = saved[key].as_str().filter(|v| allowed.contains(v)) {
             settings[key] = value.into();

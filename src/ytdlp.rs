@@ -8,6 +8,10 @@ pub const OUTPUT_TEMPLATE: &str = "%(title)s [%(id)s]%(height& {}p|)s.%(ext)s"; 
 #[cfg(test)]
 const QUALITIES: [&str; 5] = ["best4k", "mp4_4k", "mp4_1080", "mp4_720", "mp4_default"];
 
+/// Settings → Download speed, slowest first: each download's cap as yt-dlp's --limit-rate takes it (K and M are
+/// KiB and MiB, the same units as the app's "MB/s"). "unlimited" adds no cap. ui/renderer.js keeps the same list.
+pub const SPEED_LIMITS: [&str; 8] = ["500K", "1M", "2M", "5M", "10M", "25M", "50M", "unlimited"];
+
 pub const BINARY_NAME: &str = if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" };
 pub const BINARY_URL: &str = if cfg!(windows) {
     "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
@@ -103,7 +107,8 @@ fn output_template(quality: &str) -> String {
     }
 }
 
-pub fn download_args(url: &str, quality: &str, folder: &str, ffmpeg: Option<&str>) -> Result<Vec<String>, String> {
+/// `limit` is a SPEED_LIMITS cap for this download, or None for no cap.
+pub fn download_args(url: &str, quality: &str, folder: &str, ffmpeg: Option<&str>, limit: Option<&str>) -> Result<Vec<String>, String> {
     let mut args = quality_args(quality)?;
     args.extend(strings(&[
         "--no-playlist", "--encoding", "utf-8", "--newline", "--progress",
@@ -117,6 +122,9 @@ pub fn download_args(url: &str, quality: &str, folder: &str, ffmpeg: Option<&str
     ]));
     if let Some(ffmpeg) = ffmpeg {
         args.extend(strings(&["--ffmpeg-location", ffmpeg]));
+    }
+    if let Some(limit) = limit {
+        args.extend(strings(&["--limit-rate", limit]));
     }
     args.extend(strings(&["--", url]));
     Ok(args)
@@ -291,15 +299,33 @@ mod tests {
     #[test]
     fn every_quality_builds_args_that_end_with_dashdash_url() {
         for quality in QUALITIES {
-            let args = download_args("https://youtu.be/x", quality, "C:\\out", Some("ff.exe")).unwrap();
+            let args = download_args("https://youtu.be/x", quality, "C:\\out", Some("ff.exe"), None).unwrap();
             assert_eq!(args[args.len() - 2..], ["--", "https://youtu.be/x"]);
             assert!(args.iter().any(|a| a == "--no-playlist"));
             assert_eq!(after(&args, "-P"), "C:\\out");
             assert_eq!(after(&args, "-o"), OUTPUT_TEMPLATE);
             assert_eq!(after(&args, "--ffmpeg-location"), "ff.exe");
         }
-        let args = download_args("https://youtu.be/x", "mp4_720", ".", None).unwrap();
+        let args = download_args("https://youtu.be/x", "mp4_720", ".", None, None).unwrap();
         assert!(!args.iter().any(|a| a == "--ffmpeg-location"));
+        assert!(!args.iter().any(|a| a == "--limit-rate"), "no cap unless one is set");
+    }
+
+    #[test]
+    fn speed_limits_become_ytdlps_limit_rate() {
+        for quality in ["mp4_1080", "audio-mp3"] {
+            let args = download_args("https://youtu.be/x", quality, ".", None, Some("5M")).unwrap();
+            assert_eq!(after(&args, "--limit-rate"), "5M");
+            assert_eq!(args[args.len() - 2..], ["--", "https://youtu.be/x"]); // the link stays last, after `--`
+        }
+        // slowest first, then "unlimited"; every cap is a number with yt-dlp's K or M
+        let (caps, last) = SPEED_LIMITS.split_at(SPEED_LIMITS.len() - 1);
+        assert_eq!(last, ["unlimited"]);
+        let bytes = |cap: &str| {
+            let (n, unit) = cap.split_at(cap.len() - 1);
+            n.parse::<u64>().unwrap() * if unit == "K" { 1 << 10 } else { assert_eq!(unit, "M"); 1 << 20 }
+        };
+        assert!(caps.windows(2).all(|w| bytes(w[0]) < bytes(w[1])), "{caps:?}");
     }
 
     #[test]
@@ -329,7 +355,7 @@ mod tests {
             if key != "audio-aac" {
                 assert_eq!(quality_args(key).unwrap(), ["-f", "ba/b"], "{key}");
             }
-            let args = download_args("https://youtu.be/x", key, "C:\\out", Some("ff.exe")).unwrap();
+            let args = download_args("https://youtu.be/x", key, "C:\\out", Some("ff.exe"), None).unwrap();
             assert!(!args.iter().any(|a| a == "-x" || a == "--merge-output-format"), "{key}: no extraction or merge");
             // the source gets its own ".f<format>-<target>" name, never the finished file's
             assert_eq!(after(&args, "-o"), format!("%(title)s [%(id)s].f%(format_id)s-{ext}.%(ext)s"));
@@ -389,7 +415,7 @@ mod tests {
     #[test]
     fn unknown_quality_is_rejected() {
         for quality in ["nope", "toString", "custom-mp4-1000", "custom-avi-1080", "custom-mp4-1080 --exec x", "custom-mp4-+1080", "custom-mp4-", "audio-ogg", "audio-", "audio-mp3 --exec x"] {
-            let err = download_args("https://youtu.be/x", quality, ".", None).unwrap_err();
+            let err = download_args("https://youtu.be/x", quality, ".", None, None).unwrap_err();
             assert!(err.contains("Unknown quality"), "{quality}");
         }
     }
@@ -480,7 +506,7 @@ mod tests {
     #[test]
     fn styled_names_follow_the_file_names_setting() {
         let line = "NAME|Video Title\tAuthor\t1080\tavc1.640028\tmp4a.40.2";
-        let args = download_args("https://youtu.be/x", "mp4_1080", ".", None).unwrap();
+        let args = download_args("https://youtu.be/x", "mp4_1080", ".", None, None).unwrap();
         assert!(args.iter().any(|a| a.starts_with("after_move:NAME|%(title)S\t")), "yt-dlp prints the parts");
         let video = &parse_line(line).unwrap()["name"];
         assert_eq!(styled_name("classic", video, "mp4").as_deref(), Some("Video Title (1080p).mp4"));

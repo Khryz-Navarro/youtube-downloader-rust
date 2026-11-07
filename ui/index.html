@@ -84,6 +84,14 @@
     </div>
     <div class="sub" id="filename-example"></div>
   </div>
+  <div class="setting">
+    <div class="setting-head">
+      <div class="k" id="speed-label">Speed limit</div>
+      <output class="setting-value" id="speed-value" for="speed">Unlimited</output>
+    </div>
+    <input class="range" type="range" id="speed" min="0" max="7" step="1" value="7" aria-labelledby="speed-label" aria-describedby="speed-note">
+    <div class="sub" id="speed-note">The most each download may use. Takes effect on downloads you start or resume.</div>
+  </div>
 </dialog>
 
 <div class="body">
